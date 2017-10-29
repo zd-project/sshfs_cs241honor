@@ -20,7 +20,7 @@ int connect_to_master () {
 	hints.ai_family = AF_INET;
 	hints.ai_socktype = SOCK_STREAM;  // TCP
 
-	error = getaddrinfo("127.0.0.1", "1234", &hints, &res);
+	error = getaddrinfo("127.0.0.1", "18004", &hints, &res);
 		if (error) {
 			printf("Failed getaddrinfo(): %s\n", gai_strerror(error));
 			return -1;
@@ -42,7 +42,7 @@ int connect_to_master () {
 void accept_task () {
 	Message message;
 	read(sock_fd, &(message.len), sizeof(message.len));
-	read(sock_fd, &(message.buf), message.len);
+	read(sock_fd, message.buf, message.len);
 	message.buf[message.len] = '\0';
 
 	MessageInput *input = (MessageInput *)&message;
@@ -62,6 +62,7 @@ void accept_task () {
 		while (fgets(line_buf, sizeof(line_buf), fp)) {
 			strcat(output.buf, line_buf);
 		}
+		output.len = strlen(output.buf);
 		write(sock_fd, &output, sizeof(output.len) + output.len);
 		break;
 	}

@@ -8,6 +8,7 @@
 #include <arpa/inet.h>
 #include <string.h>
 #include <stdbool.h>
+#include <errno.h>
 
 #include "master.h"
 #include "protocol_master_slave.h"
@@ -72,9 +73,10 @@ void *slave_accept (void *args) {
 
 		// accept a slave
 		Netend slave;
-		slave.fd = accept(master.fd, (struct sockaddr *)&(slave.info), NULL);
+		socklen_t addrlen = sizeof(struct sockaddr);
+		slave.fd = accept(master.fd, (struct sockaddr *)&(slave.info), &addrlen);
 			if (slave.fd == -1) {
-				printf("Failed accept()\n");
+				printf("Failed accept(): %d\n", errno);
 				continue;
 			}
 		slave.ip = inet_ntoa(slave.info.sin_addr);
@@ -104,7 +106,7 @@ void *assign_task (void *args) {
 	}
 	Message *output = (Message *)malloc(sizeof(Message));
 	read(slaves[index].fd, &(output->len), sizeof(output->len));
-	read(slaves[index].fd, &(output->buf), output->len);
+	read(slaves[index].fd, output->buf, output->len);
 	pthread_mutex_lock(&slave_mutex);
 	slaves[index].busy = false;
 	pthread_mutex_unlock(&slave_mutex);
@@ -145,12 +147,18 @@ int main (int argc, char **argv) {
 		}
 	
 	while (slave_cnt == 0);
-	printf("Slave connected\n");
 	MessageInput input;
-	input.len = 6;
+	input.len = 13;
 	input.func_code = 1;
 	input.buf[0] = 'l';
 	input.buf[1] = 's';
+	input.buf[2] = ' ';
+	input.buf[3] = '-';
+	input.buf[4] = 'a';
+	input.buf[5] = 'l';
+	input.buf[6] = ' ';
+	input.buf[7] = '.';
+	input.buf[8] = '.';
 	Message *output = (Message *)assign_task(&input);
 	printf("%s\n", output->buf);
 	
