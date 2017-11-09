@@ -1,6 +1,6 @@
 #pragma once
 
-#define K 1024
+#define K 		1024
 
 typedef struct meta_data_t {
 	// not including the length of meta_data

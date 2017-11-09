@@ -21,8 +21,10 @@ int main(){
 	
 	struct sockaddr_in server;
 	server.sin_family = AF_INET;
-	server.sin_addr.s_addr = inet_addr(DEAN_PC_IP);
-	server.sin_port = htons(8888);
+	server.sin_addr.s_addr = inet_addr(DEAN_VM_IP);
+	server.sin_port = htons(9000);
+
+	printf("start connect\n");
 
 	int retCode = connect(sock, (const struct sockaddr*) &server, sizeof(server));
 	if(retCode < 0){
@@ -40,7 +42,7 @@ int main(){
 
 	// get the data ready
 	FILE_TRANSMIT* data_sent = calloc(sizeof(FILE_TRANSMIT), 0);
-	data_sent->meta_data.data_length = sizeof(META_DATA) + 32 + file_size;
+	data_sent->meta_data.data_length = sizeof(META_DATA) + file_size;
 	data_sent->meta_data.func_code = 1;
 	strcpy(data_sent->file_name, "test.txt");
 	fread(data_sent->buffer, sizeof(char), file_size, f);
