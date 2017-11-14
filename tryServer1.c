@@ -9,35 +9,47 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include "proto_client_master.h"
+#define PORT_NUM = 9000
 // handle message sent by client
 void receive(char client_message[100*K], int client_sock);
 // send feedback to client
 void write_back(char* message, int client_sock);
 int main(int argc, char* argv[]) {
     int ret_code;
-    int sock_fd = socket(AF_INET, SOCK_STREAM, 0);
+    int server_socket = socket(AF_INET, SOCK_STREAM, 0);
 
-    struct sockaddr_in server;
-    server.sin_family = AF_INET;
-    server.sin_addr.s_addr = INADDR_ANY;
-    server.sin_port = htons(9000);
+    struct addrinfo* res;
+    struct addrinfo hint;
+    memset(&hint, 0, sizeof(struct addrinfo));
+    hint.ai_family = AF_INET;
+    hint.ai_socktype = SOCK_STREAM;
+    hint.ai_flags = AI_PASSIVE;
 
-    ret_code = bind(sock_fd, (struct sockaddr*)&server, sizeof(server));
-    if (ret_code < 0) {
-        perror("bind failed\n");
+    if ((ret_code = getaddrinfo(NULL, PORT_NUM, &hint, &res)) != 0) {
+        fprintf(stderr, "%s\n", gai_strerror(ret));
         exit(1);
     }
 
-    listen(sock_fd, 10);
+    int optval = 1;
+    setsockopt(server_socket, SOL_SOCKET, SO_REUSEPORT, &optval, sizeof(optval));
+    ret_code = bind(server_socket, res -> ai_addr, res -> ai_addrlen);
+    if (ret_code < 0) {
+        perror(NULL);
+        exit(1);
+    }
 
-    // accept and incoming connection
-    puts("Waiting for incoming connections");
-    //c = sizeof(struct sockaddr_in);
+    ret_code = listen(server_socket, 10);
+    if (ret_code != 0) {
+        perror(NULL);
+        exit(1);
+    }
+
+    printf("Waiting for incoming connections");
 
     // accept connection from an incoming client
-        struct sockaddr_in client;
-        int c = sizeof(struct sockaddr_in);
-    int client_sock = accept(sock_fd, (struct sockaddr *)&client, (socklen_t*)&c);
+    struct sockaddr_in client;
+    int c = sizeof(struct sockaddr_in);
+    int client_sock = accept(server_socket, NULL, NULL);
     if (client_sock < 0) {
         perror("accept failed");
         return 1;
