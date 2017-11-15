@@ -17,3 +17,8 @@ void print_shell_prompt(void);
 char **strsplit(const char *str, size_t expected_tokens, size_t* num_token);
 // free the result of split args
 void free_args(char **args);
+
+// continuing read & write
+ssize_t read_all_from_socket(int socket, char* buffer, size_t count);
+// writing
+ssize_t write_all_to_socket(int socket, char* buffer, size_t count);

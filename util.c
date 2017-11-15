@@ -2,6 +2,8 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
+#include <arpa/inet.h>
+#include <errno.h>
 
 // print the shell prompt
 void print_shell_prompt(void){
@@ -61,3 +63,65 @@ void free_args(char **args){
 // 	}
 // 	free_args(ch);
 // }
+
+// handle read & write
+ssize_t read_all_from_socket(int socket, char *buffer, size_t count) {
+    // Your Code Here
+    printf("count: %lu\n", count);
+    ssize_t total_read = 0;
+    size_t total_request = count;
+    while(1){
+        ssize_t this_read = read(socket, buffer, count);
+        // read something
+        if(this_read > 0){
+            total_read += this_read;
+            buffer += this_read;
+            count -= this_read;
+        }
+        // succeeds
+        if((size_t) total_read == total_request){
+            return total_read;
+        }
+        // fails
+        if(this_read == 0){
+            return total_read;
+        }else if(this_read == -1){
+            if(errno == EINTR){
+                continue;
+            }else{
+                return -1;
+            }
+        }
+        // only partially done
+    }
+}
+
+ssize_t write_all_to_socket(int socket, char *buffer, size_t count) {
+    // Your Code Here
+    ssize_t total_write = 0;
+    size_t total_request = count;
+    while(1){
+        ssize_t this_write = write(socket, buffer, count);
+        // read something
+        if(this_write > 0){
+            total_write += this_write;
+            buffer += this_write;
+            count -= this_write;
+        }
+        // succeeds
+        if((size_t) total_write == total_request){
+            return total_write;
+        }
+        // fails
+        if(this_write == 0){
+            return total_write;
+        }else if(this_write == -1){
+            if(errno == EINTR){
+                continue;
+            }else{
+                return -1;
+            }
+        }
+        // only partially done
+    }
+}

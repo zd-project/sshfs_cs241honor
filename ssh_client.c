@@ -13,10 +13,10 @@
 #include "proto_client_master.h"
 #include "util.h"
 // internet constants
-#define DEAN_VM_IP 		"172.22.148.84"
-#define DEAN_PC_IP 		"10.180.129.14"
-#define USED_IP	   		DEAN_VM_IP
-#define SERVER_PORT 	9001
+#define DEAN_VM 			"fa17-cs241-083.cs.illinois.edu"
+#define SERVER_PORT_STR 	"9001"
+#define DEAN_PC_IP 			"192.168.1.2"
+#define SERVER_PORT 		9001
 // cmds
 // usage: exit
 #define SHELL_CMD_EXIT 		"exit"
@@ -27,16 +27,21 @@
 // usage: exe [cmd] <additional cmd>
 #define SHELL_CMD_EXECUTE	"exe"
 
+// utils numer
+#define MAX_FILE_NAME_LENGTH 	31
 
-// debug flag
-#define DEBUG false
+// flags
+#define DEBUG 				false
+#define GET_ADDR_INFO 		true
 
 // data transmit field
-static FILE_TRANSMIT* g_pt_file_upload;
-static FILE_TRANSMIT* g_pt_file_download;
-static EXECUTE_CMD* g_pt_execute_cmd;
-static FEEDBACK* g_pt_feedback;
-static int g_sock;
+static FILE_TRANSMIT* 	g_pt_file_upload;
+static FILE_TRANSMIT* 	g_pt_file_download;
+static EXECUTE_CMD* 	g_pt_execute_cmd;
+static FEEDBACK* 		g_pt_feedback;
+static HEARTBEAT* 		g_pt_heartbeat;
+// socket
+static volatile int g_sock;
 
 // initialize all the global data field
 void set_up_data_fields(void){
@@ -49,6 +54,7 @@ void set_up_data_fields(void){
 	g_pt_file_download = malloc(sizeof(FILE_TRANSMIT));
 	memset(g_pt_file_download, 0, sizeof(FILE_TRANSMIT));
 	g_pt_file_download->meta_data.func_code = FUNC_FILE_DOWNLOAD;
+	// will potentially be reset
 
 	// execute command struct
 	g_pt_execute_cmd = malloc(sizeof(EXECUTE_CMD));
@@ -59,13 +65,20 @@ void set_up_data_fields(void){
 	g_pt_feedback = malloc(sizeof(FEEDBACK));
 	memset(g_pt_feedback, 0, sizeof(FEEDBACK));
 	g_pt_feedback->meta_data.func_code = FUNC_FEEDBACK;
+
+	// heartbeat field
+	g_pt_heartbeat = malloc(sizeof(HEARTBEAT));
+	memset(g_pt_heartbeat, 0, sizeof(HEARTBEAT));
+	g_pt_heartbeat->meta_data.func_code = FUNC_HEARTBEAT;
 }
 
+// free all the heap data field
 void free_up_data_fields(void){
 	free(g_pt_file_upload);
 	free(g_pt_file_download);
 	free(g_pt_execute_cmd);
 	free(g_pt_feedback);
+	free(g_pt_heartbeat);
 }
 
 // connect to server
@@ -78,20 +91,45 @@ bool set_up_server_connection(void){
 		fprintf(stdout, "mpssh run on socket: %d\n", g_sock);
 	}
 
-	char* server_ip = USED_IP;
-	
-	struct sockaddr_in server;
-	server.sin_family = AF_INET;
-	server.sin_addr.s_addr = inet_addr(server_ip);
-	server.sin_port = htons(SERVER_PORT);
+	int ret_code = 0;
 
-	int ret_code = connect(g_sock, (const struct sockaddr*) &server, sizeof(server));
-	if(ret_code < 0){
-		perror("connect failed");
-		return false;
+	if(GET_ADDR_INFO == true){
+		// get address hints
+	    struct addrinfo hints, *result;
+	    memset(&hints, 0, sizeof(struct addrinfo));
+	    hints.ai_family = AF_INET;
+	    hints.ai_socktype = SOCK_STREAM;
+	    // get addr info
+	    ret_code = getaddrinfo(DEAN_VM, SERVER_PORT_STR, &hints, &result);
+	    if (ret_code != 0) {
+	        fprintf(stderr, "getaddrinfo error: %s\n", gai_strerror(ret_code));
+	        return false;
+	    }
+
+	     // connect
+	    ret_code = connect(g_sock, result->ai_addr, result->ai_addrlen);
+	    if(ret_code < 0){
+	        perror("connect() failed");
+	        return false;
+	    }
+
+	    freeaddrinfo(result);
 	}else{
-		fprintf(stdout, "connect to server %s succeeded\n", server_ip);
+		printf("start connection\n");
+		struct sockaddr_in server;
+		server.sin_family = AF_INET;
+		server.sin_addr.s_addr = inet_addr(DEAN_PC_IP);
+		server.sin_port = htons(SERVER_PORT);
+
+		ret_code = connect(g_sock, (const struct sockaddr*) &server, sizeof(server));
+		if(ret_code < 0){
+			perror("connect() failed");
+			return false;
+		}
 	}
+
+	printf("Connection done\n"); 
+
 	return true;
 }
 
@@ -110,27 +148,29 @@ bool read_file_and_upload(char* file_name){
 	}
 	// get file size
 	fseek(f, 0L, SEEK_END);
-	long file_size = ftell(f) - 1;
+	long file_size = ftell(f);
 	rewind(f);
 
 	// get the data ready
-	g_pt_file_upload->meta_data.data_length = sizeof(META_DATA) + file_size;
-	strncpy(g_pt_file_upload->file_name, file_name, 31);
-	g_pt_file_upload->file_name[strlen(file_name)] = '\0';
+	g_pt_file_upload->meta_data.data_length = (MAX_FILE_NAME_LENGTH + 1) + file_size;
+	strncpy(g_pt_file_upload->file_name, file_name, MAX_FILE_NAME_LENGTH);
+	g_pt_file_upload->file_name[MAX_FILE_NAME_LENGTH] = '\0';
 	fread(g_pt_file_upload->buffer, sizeof(char), file_size, f);
 
 	printf("Func code: %d\n", g_pt_file_upload->meta_data.func_code);
 	printf("Data len: %u\n", g_pt_file_upload->meta_data.data_length);
 	printf("File name: %s\n", g_pt_file_upload->file_name);
-	printf("File content:\n%s\n", g_pt_file_upload->buffer);
+	printf("File content:\n%s", g_pt_file_upload->buffer);
 
 	// send the data accross
-	int ret_code = send(g_sock, g_pt_file_upload, sizeof(FILE_TRANSMIT), 0);
+	ssize_t ret_code = write_all_to_socket(g_sock, (char*) g_pt_file_upload, sizeof(FILE_TRANSMIT));
 	if(ret_code < 0){
 		perror("Upload failed");
 		return false;
 	}
+	printf("write bytes: %ld\n", ret_code);
 
+	fclose(f);
 	printf("File: [%s] uploaded to the server\n", file_name);
 	return true;
 }
@@ -144,11 +184,12 @@ bool send_cmd_to_server(char* cmd_to_server){
 	printf("Data len: %u\n", g_pt_execute_cmd->meta_data.data_length);
 	printf("CMD: [%s]\n", g_pt_execute_cmd->command);
 
-	int ret_code = send(g_sock, g_pt_execute_cmd, sizeof(EXECUTE_CMD), 0);
+	ssize_t ret_code = write_all_to_socket(g_sock, (char*) g_pt_execute_cmd, sizeof(EXECUTE_CMD));
 	if(ret_code < 0){
-		perror("Exe failed");
+		perror("send() failed");
 		return false;
 	}
+	printf("write bytes: %ld\n", ret_code);
 
 	printf("CMD: [%s] sent to the server\n", cmd_to_server);
 	return true;
@@ -157,14 +198,16 @@ bool send_cmd_to_server(char* cmd_to_server){
 // receive the feedback
 void receive_feedback_and_print(void){
 	printf("Wait for feedback\n");
-	int ret_code = recv(g_sock, g_pt_feedback, sizeof(FEEDBACK), 0);
+	ssize_t ret_code = read_all_from_socket(g_sock, (char*) g_pt_feedback, sizeof(FEEDBACK));
 	if(ret_code < 0){
-		perror("recv failed");
+		perror("recv() failed");
 		return;
 	}
+	printf("read bytes: %ld\n", ret_code);
 	
 	// extract the string
 	if(g_pt_feedback->meta_data.func_code != FUNC_FEEDBACK){
+		fprintf(stdout, "Wrong func code: %d\n", g_pt_feedback->meta_data.func_code);
 		return;
 	}
 	fprintf(stdout, "Server: %s\n", g_pt_feedback->feedback);
@@ -172,7 +215,48 @@ void receive_feedback_and_print(void){
 
 // try download the file
 void download_file(char* file_name){
-	
+	if(strlen(file_name) > 31){
+		printf("file name too long!\n");
+		return;
+	}
+	printf("download file: [%s]\n", file_name);
+
+	// get the request body ready
+	g_pt_file_download->meta_data.func_code = FUNC_FILE_DOWNLOAD;
+	g_pt_file_download->meta_data.data_length = MAX_FILE_NAME_LENGTH + 1;
+	strncpy(g_pt_file_download->file_name, file_name, MAX_FILE_NAME_LENGTH);
+	g_pt_file_download->file_name[MAX_FILE_NAME_LENGTH] = '\0';
+
+	ssize_t ret_code = write_all_to_socket(g_sock, (char*) g_pt_file_download, sizeof(FILE_TRANSMIT));
+	if(ret_code < 0){
+		perror("send() failed");
+		return;
+	}
+	printf("write bytes: %ld\n", ret_code);
+
+	ret_code = read_all_from_socket(g_sock, (char*) g_pt_file_download, sizeof(FILE_TRANSMIT));
+	if(ret_code < 0){
+		perror("recv() failed");
+		return;
+	}
+	printf("read bytes: %ld\n", ret_code);
+
+	if(g_pt_file_download->meta_data.func_code == FUNC_FEEDBACK){
+		fprintf(stdout, "File [%s] doesn't exit\n", file_name);
+		return;
+	}
+
+	printf("Data len: %d\n", g_pt_file_download->meta_data.data_length);
+	printf("File name: %s\n", g_pt_file_download->file_name);
+	printf("File content:\n%s", g_pt_file_download->buffer);
+
+	// open the file, clear the content and write to it
+	size_t file_length = ((size_t) g_pt_file_download->meta_data.data_length) - (MAX_FILE_NAME_LENGTH + 1);
+	FILE* f = fopen(file_name, "w");
+	fwrite(g_pt_file_download->buffer, sizeof(char), file_length, f);
+	fclose(f);
+
+	fprintf(stdout, "Download [%s] complete\n", file_name);
 }
 
 // cmd process entry

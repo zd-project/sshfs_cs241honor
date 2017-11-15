@@ -2,13 +2,15 @@
 
 #define K 		1024
 
+// the metadata
 typedef struct meta_data_t {
 	// not including the length of meta_data
 	unsigned 	data_length;
 	int 		func_code;
 } META_DATA;
 
-// function code
+// function code:
+// upload
 #define FUNC_FILE_UPLOAD 	0
 // download
 #define FUNC_FILE_DOWNLOAD 	1
@@ -16,6 +18,8 @@ typedef struct meta_data_t {
 #define FUNC_EXECUTE_CMD 	2
 // feedback
 #define FUNC_FEEDBACK		3
+// hearbeat
+#define FUNC_HEARTBEAT 		4
 
 // file transmission protocal
 typedef struct file_transmit_t {
@@ -31,8 +35,14 @@ typedef struct execute_cmd_t {
 } EXECUTE_CMD;
 
 // feedback struct
-typedef struct feedback_t
-{
+typedef struct feedback_t {
 	META_DATA 	meta_data;
-	char 		feedback[16 * K];
+	char 		feedback[16 * K + 32];
 } FEEDBACK;
+
+// heartbeat thread
+typedef struct heartbeat_t {
+	META_DATA 	meta_data;
+	char 		buffer[24];
+} HEARTBEAT;
+
