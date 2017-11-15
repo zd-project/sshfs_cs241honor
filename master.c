@@ -7,13 +7,11 @@
 #include <netdb.h>
 #include <arpa/inet.h>
 #include <string.h>
+#include <stdbool.h>
+#include <errno.h>
 
-typedef struct {
-	int fd;
-	struct sockaddr_in info;
-	char *ip;
-	unsigned short port;
-} Netend;
+#include "master.h"
+#include "protocol_master_slave.h"
 
 Netend master;
 Netend slaves[16];
@@ -32,7 +30,7 @@ int server_init () {
 	hints.ai_socktype = SOCK_STREAM;  // TCP
 	hints.ai_flags = AI_PASSIVE;  // allow multiple connections
 	
-	error = getaddrinfo(NULL, "1234", &hints, &res);
+	error = getaddrinfo(NULL, "18004", &hints, &res);
 		if (error) {
 			printf("Failed getaddrinfo(): %s\n", gai_strerror(error));
 			return -1;
@@ -75,9 +73,15 @@ void *slave_accept (void *args) {
 
 		// accept a slave
 		Netend slave;
-		slave.fd = accept(master.fd, (struct sockaddr *)&(slave.info), NULL);
+		socklen_t addrlen = sizeof(struct sockaddr);
+		slave.fd = accept(master.fd, (struct sockaddr *)&(slave.info), &addrlen);
+			if (slave.fd == -1) {
+				printf("Failed accept(): %d\n", errno);
+				continue;
+			}
 		slave.ip = inet_ntoa(slave.info.sin_addr);
 		slave.port = ntohs(slave.info.sin_port);
+		slave.busy = false;
 		
 		// write slave info into array
 		pthread_mutex_lock(&slave_mutex);
@@ -85,6 +89,28 @@ void *slave_accept (void *args) {
 		slave_cnt ++;
 		pthread_mutex_unlock(&slave_mutex);
 	}
+}
+
+// Assign task to an idle slave
+void *assign_task (void *args) {
+	Message *input = (Message *)args;
+	pthread_mutex_lock(&slave_mutex);
+	int index;
+	for (index = 0; index < slave_cnt; index ++) {
+		if (slaves[index].busy == false) {
+			slaves[index].busy = true;
+			pthread_mutex_unlock(&slave_mutex);
+			write(slaves[index].fd, input, sizeof(input->len) + input->len);
+			break;
+		}
+	}
+	Message *output = (Message *)malloc(sizeof(Message));
+	read(slaves[index].fd, &(output->len), sizeof(output->len));
+	read(slaves[index].fd, output->buf, output->len);
+	pthread_mutex_lock(&slave_mutex);
+	slaves[index].busy = false;
+	pthread_mutex_unlock(&slave_mutex);
+	return output;
 }
 
 // Delete a disconnected slave
@@ -119,6 +145,22 @@ int main (int argc, char **argv) {
 			printf("Failed spawn slave_accept()\n");
 			return -1;
 		}
+	
+	while (slave_cnt == 0);
+	MessageInput input;
+	input.len = 13;
+	input.func_code = 1;
+	input.buf[0] = 'l';
+	input.buf[1] = 's';
+	input.buf[2] = ' ';
+	input.buf[3] = '-';
+	input.buf[4] = 'a';
+	input.buf[5] = 'l';
+	input.buf[6] = ' ';
+	input.buf[7] = '.';
+	input.buf[8] = '.';
+	Message *output = (Message *)assign_task(&input);
+	printf("%s\n", output->buf);
 	
 	pthread_join(thread_slave_accept, NULL);
 
