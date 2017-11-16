@@ -30,6 +30,83 @@
 #include <fcntl.h>
 #include <stddef.h>
 #include <assert.h>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netdb.h>
+#include <unistd.h>
+#include <arpa/inet.h>
+const char *PORT = "16354";
+char defaultFilename[1000] = "myfs.honor";
+char defaultContent[1000] = "The first file\n";
+
+void read_from_internet() {
+    int sock_fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sock_fd == -1) {
+        perror(NULL);
+        exit(1);
+    }
+
+    int optval = 1;
+    setsockopt(sock_fd, SOL_SOCKET, SO_REUSEPORT, &optval, sizeof(optval));
+
+    struct addrinfo hints;
+    memset(&hints, 0, sizeof(struct addrinfo));
+    hints.ai_family = AF_INET; /* IPv4 only */
+    hints.ai_socktype = SOCK_STREAM; /* TCP */
+    hints.ai_flags = AI_PASSIVE;
+
+    struct addrinfo *result;
+    int err = getaddrinfo(NULL, PORT, &hints, &result);
+    if (err) {
+        fprintf(stderr, "%s\n", gai_strerror(err));
+        exit(1);
+    }
+
+    if (bind(sock_fd, result->ai_addr, result->ai_addrlen)) {
+        perror(NULL);
+        exit(1);
+    }
+
+    if (listen(sock_fd, 10) != 0) {
+        perror(NULL);
+        exit(1);
+    }
+    
+    printf("Syncing...\n");
+    int client_fd = accept(sock_fd, NULL, NULL);
+    if (client_fd == -1) {
+        perror(NULL);
+        exit(1);
+    }
+
+    int len;
+    len = read(client_fd, defaultFilename, sizeof(defaultFilename));
+    defaultFilename[len] = '\0';
+
+    printf("Read files\n");
+    printf("===\n");
+    printf("%s\n", defaultFilename);
+
+    len = read(client_fd, defaultContent, sizeof(defaultContent));
+    defaultContent[len - 1] = '\n';
+    defaultContent[len] = '\0';
+
+    printf("Read content: %d chars\n", len);
+    printf("===\n");
+    printf("%s\n", defaultContent);
+
+    if (shutdown(sock_fd, SHUT_RDWR) != 0) {
+        perror("shutdown():");
+    }
+    close(sock_fd);
+    if (shutdown(client_fd, SHUT_RDWR) != 0) {
+        perror("shutdown():");
+    }
+    close(client_fd);
+
+    freeaddrinfo(result);
+}
 
 //static void *myfs_init(struct fuse_conn_info *conn,
 //			struct fuse_config *cfg)
@@ -38,8 +115,6 @@
 //	cfg->kernel_cache = 1;
 //	return NULL;
 //}
-char *defaultFilename = "myfs.honor";
-char *defaultContent = "The first file\n";
 
 static int myfs_getattr(const char *path, struct stat *stbuf,
 			 struct fuse_file_info *fi)
@@ -119,5 +194,11 @@ static struct fuse_operations myfs_oper = {
 
 int main(int argc, char *argv[])
 {
+    if (!strcmp(argv[1], "-n")) {
+        read_from_internet();
+        argv[1] = argv[0];
+        argc--;
+        argv++;
+    }
 	return fuse_main(argc, argv, &myfs_oper, NULL);
 }
