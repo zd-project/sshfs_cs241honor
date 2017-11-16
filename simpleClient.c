@@ -5,7 +5,7 @@
 #include <sys/socket.h>
 #include <netdb.h>
 #include <unistd.h>
-const char *HOST = "fa17-cs241-185.cs.illinois.edu";
+const char *HOST = "127.0.0.1";
 const char *PORT = "16354";
 
 int main(int argc, char **argv)
