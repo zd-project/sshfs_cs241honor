@@ -22,7 +22,7 @@ DEFS     := -DOS_COMMON_EXT -DNDEBUG -D_FILE_OFFSET_BITS=64
 EXTRA_CFLAGS := -pthread
 
 # -L../bin -lclient
-EXTRA_LDFLAGS := -pthread -lrt
+EXTRA_LDFLAGS := #-pthread -lrt
 EXTRA_LIBS	:=
 # -Lshfe/linux64 -ltraderapi
 

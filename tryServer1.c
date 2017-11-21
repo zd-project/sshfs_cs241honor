@@ -1,6 +1,6 @@
-#include<stdio.h>
-#include <stdlib.h>
 #include <sys/types.h>
+#include <stdlib.h>
+#include <stdio.h>
 #include<string.h>
 #include <netdb.h>
 #include<sys/socket.h>
@@ -12,16 +12,16 @@
 #include "utils.h"
 
 #define PORT_NUM "9001"
-#define CLINENT_MESSAGE_SIZE 100*K
+#define CLIENT_MESSAGE_SIZE 100*K
 
 // handle message sent by client
 void receive(char client_message[100*K], int client_sock);
 // send feedback to client
 void write_back(char* message, int client_sock);
 // action functions according to func code
-void upload_file(char[CLINENT_MESSAGE_SIZE] client_message, unsigned data_length, int client_sock);
-void download_file(char[CLINENT_MESSAGE_SIZE] client_message, unsigned data_length, int client_sock);
-void exec_cmd(char[CLINENT_MESSAGE_SIZE] client_message, int client_sock);
+void upload_file(char client_message[CLIENT_MESSAGE_SIZE], unsigned data_length, int client_sock);
+void download_file(char client_message[CLIENT_MESSAGE_SIZE], unsigned data_length, int client_sock);
+void exec_cmd(char client_message[CLIENT_MESSAGE_SIZE], int client_sock);
 
 int main(int argc, char* argv[]) {
     int ret_code;
@@ -31,8 +31,8 @@ int main(int argc, char* argv[]) {
     struct addrinfo hint;
     memset(&hint, 0, sizeof(struct addrinfo));
     hint.ai_family = AF_INET;
-    hint.ai_socktype = SOCK_STREAM;
-    hint.ai_flags = AI_PASSIVE;
+	hint.ai_socktype = SOCK_STREAM;
+	hint.ai_flags = AI_PASSIVE;
 
     if ((ret_code = getaddrinfo(NULL, PORT_NUM, &hint, &res)) != 0) {
         fprintf(stderr, "%s\n", gai_strerror(ret_code));
@@ -62,7 +62,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
     printf("Connection accepted\n");
-    char client_message[CLINENT_MESSAGE_SIZE];
+    char client_message[CLIENT_MESSAGE_SIZE];
     int read_size;
 
     // receive messages from client
@@ -78,7 +78,7 @@ int main(int argc, char* argv[]) {
     return 0;
 }
 
-void receive(char client_message[CLINENT_MESSAGE_SIZE], int client_sock) {
+void receive(char client_message[CLIENT_MESSAGE_SIZE], int client_sock) {
     META_DATA* meta = (META_DATA*) client_message;
     unsigned data_length = meta -> data_length;
     // printf("data_length: %u\n", data_length);
@@ -95,7 +95,7 @@ void receive(char client_message[CLINENT_MESSAGE_SIZE], int client_sock) {
     }
 }
 
-void exec_cmd(char[CLINENT_MESSAGE_SIZE] client_message, int client_sock) {
+void exec_cmd(char client_message[CLIENT_MESSAGE_SIZE], int client_sock) {
     EXECUTE_CMD* cmd_block = (EXECUTE_CMD*) client_message;
     char* cmd = cmd_block -> command;
     int fd[2];
@@ -125,7 +125,7 @@ void exec_cmd(char[CLINENT_MESSAGE_SIZE] client_message, int client_sock) {
     }
 }
 
-void upload_file(char[CLINENT_MESSAGE_SIZE] client_message, unsigned data_length, int client_sock) {
+void upload_file(char client_message[CLIENT_MESSAGE_SIZE] , unsigned data_length, int client_sock) {
     FILE_TRANSMIT* file_block = (FILE_TRANSMIT*) client_message;
     char* file_name = file_block -> file_name;
     printf("file_name: %s\n", file_name);
@@ -137,7 +137,7 @@ void upload_file(char[CLINENT_MESSAGE_SIZE] client_message, unsigned data_length
     write_back("File upload success", client_sock);
 }
 
-void download_file(char[CLINENT_MESSAGE_SIZE] client_message, unsigned data_length, int client_sock) {
+void download_file(char client_message[CLIENT_MESSAGE_SIZE], unsigned data_length, int client_sock) {
     FILE_TRANSMIT* file_block = (FILE_TRANSMIT*) client_message;
     FILE_TRANSMIT* file_to_upload = calloc(1,sizeof(FILE_TRANSMIT));
     char* file_name_requested = file_block -> file_name;
