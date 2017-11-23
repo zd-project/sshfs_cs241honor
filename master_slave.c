@@ -10,15 +10,15 @@
 #include <stdbool.h>
 #include <errno.h>
 
-#include "master.h"
+#include "master_slave.h"
 #include "protocol_master_slave.h"
 
+const int SLAVE_MAX = 16;
+
 Netend master;
-Netend slaves[16];
+Netend slaves[SLAVE_MAX];
 int slave_cnt = 0;
-pthread_mutex_t slave_mutex;
-pthread_cond_t slave_cv;
-pthread_mutex_t slave_cvmtx;
+pthread_mutex_t slave_mtx;
 
 // Initialize master server
 int server_init () {
@@ -54,23 +54,15 @@ int server_init () {
 	memcpy(&(master.info), (struct sockaddr_in *)res->ai_addr, sizeof(struct sockaddr_in));
 	master.ip = inet_ntoa(master.info.sin_addr);
 	master.port = ntohs(master.info.sin_port);
+	master.active = true;
 
 	return 0;
 }
 
 // Accept slave connections continuously
 void *slave_accept (void *args) {
-	pthread_mutex_init(&slave_mutex, NULL);
-	pthread_cond_init(&slave_cv, NULL);
-	pthread_mutex_init(&slave_cvmtx, NULL);
-	while (1) {
-		// pause accepting when slaves array is full
-		pthread_mutex_lock(&slave_cvmtx);
-		while (slave_cnt == sizeof(slaves)/sizeof(Netend)) {
-			pthread_cond_wait(&slave_cv, &slave_cvmtx);
-		}
-		pthread_mutex_unlock(&slave_cvmtx);
-
+	pthread_mutex_init(&slave_mtx, NULL);
+	while (slave_cnt < SLAVE_MAX) {
 		// accept a slave
 		Netend slave;
 		socklen_t addrlen = sizeof(struct sockaddr);
@@ -81,54 +73,37 @@ void *slave_accept (void *args) {
 			}
 		slave.ip = inet_ntoa(slave.info.sin_addr);
 		slave.port = ntohs(slave.info.sin_port);
-		slave.busy = false;
+		slave.active = true;
 		
 		// write slave info into array
-		pthread_mutex_lock(&slave_mutex);
+		pthread_mutex_lock(&slave_mtx);
 		memcpy(&slaves[slave_cnt], &slave, sizeof(Netend));
+		Fileinfo.init_slave(slave_cnt, slave.fd);
 		slave_cnt ++;
-		pthread_mutex_unlock(&slave_mutex);
+		pthread_mutex_unlock(&slave_mtx);
 	}
-}
-
-// Assign task to an idle slave
-void *assign_task (void *args) {
-	Message *input = (Message *)args;
-	pthread_mutex_lock(&slave_mutex);
-	int index;
-	for (index = 0; index < slave_cnt; index ++) {
-		if (slaves[index].busy == false) {
-			slaves[index].busy = true;
-			pthread_mutex_unlock(&slave_mutex);
-			write(slaves[index].fd, input, sizeof(input->len) + input->len);
-			break;
-		}
-	}
-	Message *output = (Message *)malloc(sizeof(Message));
-	read(slaves[index].fd, &(output->len), sizeof(output->len));
-	read(slaves[index].fd, output->buf, output->len);
-	pthread_mutex_lock(&slave_mutex);
-	slaves[index].busy = false;
-	pthread_mutex_unlock(&slave_mutex);
-	return output;
 }
 
 // Delete a disconnected slave
 void slave_delete (int slave_fd) {
-	pthread_mutex_lock(&slave_mutex);
+	pthread_mutex_lock(&slave_mtx);
 	for (int index = 0; index < slave_cnt; index ++) {
 		if (slaves[index].fd == slave_fd) {
-			// remove the slave at slaves[index]
-			if (index != slave_cnt - 1) {
-				// move the last slave into the empty slot
-				memcpy(&slaves[index], &slaves[slave_cnt - 1], sizeof(Netend));
-			}
-			slave_cnt --;
-			pthread_cond_signal(&slave_cv);
-			break;
+			slaves[index].active = false;
 		}
 	}
-	pthread_mutex_unlock(&slave_mutex);
+	pthread_mutex_unlock(&slave_mtx);
+}
+
+// Transmit a file to a slave
+int save_file_on_slave (MessageFileUpload* message) {
+	if (slave_cnt == 0) return -1;
+	int slave_id;
+	do {
+		slave_id = rand() % slave_cnt;
+	} while (slaves[slave_id].active == false);
+	write(slaves[slave_id].fd, message, sizeof(input->len) + input->len);
+	return 0;
 }
 
 int main (int argc, char **argv) {
@@ -146,21 +121,6 @@ int main (int argc, char **argv) {
 			return -1;
 		}
 	
-	while (slave_cnt == 0);
-	MessageInput input;
-	input.len = 13;
-	input.func_code = 1;
-	input.buf[0] = 'l';
-	input.buf[1] = 's';
-	input.buf[2] = ' ';
-	input.buf[3] = '-';
-	input.buf[4] = 'a';
-	input.buf[5] = 'l';
-	input.buf[6] = ' ';
-	input.buf[7] = '.';
-	input.buf[8] = '.';
-	Message *output = (Message *)assign_task(&input);
-	printf("%s\n", output->buf);
 	
 	pthread_join(thread_slave_accept, NULL);
 

@@ -8,5 +8,6 @@
 #include <string.h>
 
 int connect_to_master ();
-void accept_task ();
+void send_filelist_to_master ();
+void process_file_request ();
 

@@ -39,36 +39,19 @@ int connect_to_master () {
 	return 0;
 }
 
-void accept_task () {
-	Message message;
-	read(sock_fd, &(message.len), sizeof(message.len));
-	read(sock_fd, message.buf, message.len);
-	message.buf[message.len] = '\0';
-
-	MessageInput *input = (MessageInput *)&message;
-	Message output;
-	switch (input->func_code) {
-	case FUNC_FILE_TRANSMIT:
-		
-		break;
-	case FUNC_EXEC_CMD: {
-		FILE *fp = popen(((MessageExecCmd *)input)->cmd_buf, "r");
-			if (!fp) {
-				printf("Failed to execute command\n");
-				break;
-			}
-		output.buf[0] = '\0';
-		char line_buf[16 * K];
-		while (fgets(line_buf, sizeof(line_buf), fp)) {
-			strcat(output.buf, line_buf);
+void send_filelist_to_master () {
+	FILE *fp = popen("ls fs/", "r");
+		if (!fp) {
+			printf("Failed to read from filesystem\n");
+			return;
 		}
-		output.len = strlen(output.buf);
-		write(sock_fd, &output, sizeof(output.len) + output.len);
-		break;
+	char file_list[65536];
+	file_list[0] = '\0';
+	char line_buf[16 * K];
+	while (fgets(line_buf, sizeof(line_buf), fp)) {
+		strcat(file_list, line_buf);
 	}
-	default:
-		break;
-	}
+	write(sock_fd, file_list, strlen(file_list));
 }
 
 int main (int argc, char **argv) {
@@ -79,9 +62,10 @@ int main (int argc, char **argv) {
 			printf("Failed connect_to_server()\n");
 			return -1;
 		}
+	send_filelist_to_master();
 
 	while (1) {
-		accept_task();
+		process_file_request();
 	}
 
 	return 0;
