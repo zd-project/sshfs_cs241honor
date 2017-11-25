@@ -1,3 +1,4 @@
+#include <stdint.h>
 
 #define FILEINFO_NOFILE -1
 #define FILEINFO_HASH_VALUE_MAX 65536

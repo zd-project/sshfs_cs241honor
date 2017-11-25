@@ -17,6 +17,11 @@ typedef struct {
 	bool active;
 } Netend;
 
+#define SLAVE_MAX 16
+
+extern Netend master;
+extern Netend slaves[SLAVE_MAX];
+
 int server_init ();
 void *slave_accept (void *args);
 void slave_delete (int slave_fd);

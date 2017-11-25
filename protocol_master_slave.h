@@ -24,7 +24,7 @@ typedef struct {
 	uint32_t func_code;
 	char file_name[32];
 	char file_buf[16 * K - sizeof(uint32_t) - sizeof(char[32])];
-} MessageFileUpload;
+} MessageFileTransmit;
 
 #define FUNC_FILE_TRANSMIT 0
 #define FUNC_EXEC_CMD 1
