@@ -1,22 +1,23 @@
+#include <arpa/inet.h>
+#include <errno.h>
+#include <netdb.h>
+#include <pthread.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
-#include <pthread.h>
+#include <string.h>
 #include <sys/types.h>
 #include <sys/socket.h>
-#include <netdb.h>
-#include <arpa/inet.h>
-#include <string.h>
-#include <stdbool.h>
-#include <errno.h>
+#include <unistd.h>
 
 #include "master_slave.h"
-#include "protocol_master_slave.h"
-#include "fileinfo.h"
+#include "filemgr.h"
+#include "protocol.h"
+#include "types.h"
 
 Netend master;
 Netend slaves[SLAVE_MAX];
-int slave_cnt = 0;
+Slaveid slave_cnt = 0;
 pthread_mutex_t slave_mtx;
 
 // Initialize master server
@@ -77,7 +78,7 @@ void *slave_accept (void *args) {
 		// write slave info into array
 		pthread_mutex_lock(&slave_mtx);
 		memcpy(&slaves[slave_cnt], &slave, sizeof(Netend));
-		Fileinfo_init_slave(slave_cnt, slave.fd);
+		Filemgr_init_slave(slave_cnt, slave.fd);
 		slave_cnt ++;
 		pthread_mutex_unlock(&slave_mtx);
 	}
@@ -94,15 +95,13 @@ void slave_delete (int slave_fd) {
 	pthread_mutex_unlock(&slave_mtx);
 }
 
-// Transmit a file to a slave
-int save_file_on_slave (MessageFileTransmit* message) {
-	if (slave_cnt == 0) return -1;
-	int slave_id;
+// Return a target slave to save the file
+Slaveid get_target_slave () {
+	Slaveid slave_id;
 	do {
 		slave_id = rand() % slave_cnt;
 	} while (slaves[slave_id].active == false);
-	write(slaves[slave_id].fd, message, sizeof(message->len) + message->len);
-	return 0;
+	return slave_id;
 }
 
 int main (int argc, char **argv) {

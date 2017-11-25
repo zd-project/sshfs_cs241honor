@@ -8,7 +8,7 @@
 #include <string.h>
 
 #include "slave.h"
-#include "protocol_master_slave.h"
+#include "protocol.h"
 
 int sock_fd;
 
@@ -65,7 +65,7 @@ int main (int argc, char **argv) {
 	send_filelist_to_master();
 
 	while (1) {
-		process_file_request();
+	//	process_file_request();
 	}
 
 	return 0;
