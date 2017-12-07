@@ -30,6 +30,7 @@ typedef struct {
 #define FUNC_PUT 1
 #define FUNC_DEL 2
 #define FUNC_STAT 3
+#define FUNC_RSPD 4
 
 #define RESP_SUCCEED 0
 #define RESP_FAILED 1
