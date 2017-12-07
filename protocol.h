@@ -12,9 +12,9 @@ typedef struct {
 	char buf[16 * K];
 } Message;
 
-#define FUNC_EXEC 0
-#define FUNC_UPLD 1
-#define FUNC_DNLD 2
+#define FUNC_EXEC 1
+#define FUNC_UPLD 2
+#define FUNC_DNLD 3
 
 typedef struct {
 	uint8_t func_code;
@@ -26,11 +26,11 @@ typedef struct {
 	char buf[16 * K];
 } FuseMsg;
 
-#define FUNC_GET 0
-#define FUNC_PUT 1
-#define FUNC_DEL 2
-#define FUNC_STAT 3
-#define FUNC_RSPD 4
+#define FUNC_RESP 1
+#define FUNC_GET 2
+#define FUNC_PUT 3
+#define FUNC_DEL 4
+#define FUNC_STAT 5
 
 #define RESP_SUCCEED 0
 #define RESP_FAILED 1

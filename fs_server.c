@@ -29,7 +29,7 @@ int server_init () {
 	hints.ai_socktype = SOCK_STREAM;  // TCP
 	hints.ai_flags = AI_PASSIVE;  // allow multiple connections
 	
-	error = getaddrinfo(NULL, "18004", &hints, &res);
+	error = getaddrinfo(NULL, "9001", &hints, &res);
 		if (error) {
 			printf("Failed getaddrinfo(): %s\n", gai_strerror(error));
 			return -1;
