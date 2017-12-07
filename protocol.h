@@ -1,5 +1,7 @@
 #pragma once
 
+#include <stdbool.h>
+#include <stdint.h>
 #include "types.h"
 
 #define K 1024
@@ -28,4 +30,7 @@ typedef struct {
 #define FUNC_PUT 1
 #define FUNC_DEL 2
 #define FUNC_STAT 3
+
+#define RESP_SUCCEED 0
+#define RESP_FAILED 1
 
