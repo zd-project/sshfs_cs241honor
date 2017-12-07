@@ -29,3 +29,18 @@ typedef struct {
 #define FUNC_FILE_TRANSMIT 0
 #define FUNC_EXEC_CMD 1
 
+typedef struct {
+	uint8_t func_code;
+	uint8_t response;
+	char filename[FILENAME_LEN];
+	size_t size;
+	size_t offset;
+	bool is_trunc;
+	char buf[16 * K];
+} FuseMsg;
+
+#define FUNC_GET 0
+#define FUNC_PUT 1
+#define FUNC_DEL 2
+#define FUNC_STAT 3
+
