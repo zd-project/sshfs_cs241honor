@@ -1,9 +1,10 @@
+#include <errno.h>
+#include <fcntl.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
 #include <string.h>
-#include <errno.h>
-#include <stdbool.h>
+#include <unistd.h>
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -14,18 +15,6 @@
 #include "network_utils.h"
 #include "protocol.h"
 #include "types.h"
-
-/*
-typedef struct {
-	uint8_t func_code;
-	uint8_t response;
-	char filename[FILENAME_LEN];
-	size_t size;
-	size_t offset;
-	bool is_trunc;
-	char buf[16 * K];
-} FuseMsg;
-*/
 
 // fs related constants
 #define TEMP_DIR_NAME 		"slave_dir"
@@ -39,15 +28,6 @@ static int sock_fd = -1;
 
 // local space
 static FuseMsg* g_pt_msg = NULL;
-
-// helper functions 
-void initialize_global_data(void);
-void close_slave(void);
-
-void connect_to_master();
-
-void switch_to_work_dir(void);
-void send_all_current_files(void);
 
 // switch to working directory
 void switch_to_work_dir(void){
@@ -149,7 +129,7 @@ void process_stat () {
 }
 
 void process_request () {
-	read_all_from_socket(sock_fd, g_pt_msg, sizeof(FuseMsg));
+	read_all_from_socket(sock_fd, (char *)g_pt_msg, sizeof(FuseMsg));
 	switch (g_pt_msg->func_code) {
 	case FUNC_GET:
 		process_get();
@@ -166,7 +146,7 @@ void process_request () {
 	default:
 		break;
 	}
-	write_all_to_socket(sock_fd, g_pt_mag, sizeof(FuseMsg));
+	write_all_to_socket(sock_fd, (char *)g_pt_msg, sizeof(FuseMsg));
 }
 
 // start our client
