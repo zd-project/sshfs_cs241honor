@@ -14,7 +14,7 @@
 typedef struct {
 	int fd;
 	struct sockaddr_in info;
-	char *ip;
+	char ip[256];
 	unsigned short port;
 	bool active;
 } Netend;
@@ -22,8 +22,11 @@ typedef struct {
 extern Netend master;
 extern Netend slaves[SLAVE_MAX];
 
+// Initialize master server
 int server_init ();
+// Accept slave connections continuously
 void *slave_accept (void *args);
+// Delete a disconnected slave
 void slave_delete (int slave_fd);
-Slaveid get_target_slave ();
-
+// Run master server that communicate with slaves
+int server_run ();

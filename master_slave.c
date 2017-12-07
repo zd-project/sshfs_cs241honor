@@ -20,7 +20,6 @@ Netend slaves[SLAVE_MAX];
 Slaveid slave_cnt = 0;
 pthread_mutex_t slave_mtx;
 
-// Initialize master server
 int server_init () {
 	int error = 0;
 
@@ -52,14 +51,14 @@ int server_init () {
 		}
 	
 	memcpy(&(master.info), (struct sockaddr_in *)res->ai_addr, sizeof(struct sockaddr_in));
-	master.ip = inet_ntoa(master.info.sin_addr);
+	char* up = inet_ntoa(master.info.sin_addr);
+	strcpy(master.ip, ip)
 	master.port = ntohs(master.info.sin_port);
 	master.active = true;
 
 	return 0;
 }
 
-// Accept slave connections continuously
 void *slave_accept (void *args) {
 	pthread_mutex_init(&slave_mtx, NULL);
 	while (slave_cnt < SLAVE_MAX) {
@@ -71,7 +70,8 @@ void *slave_accept (void *args) {
 				printf("Failed accept(): %d\n", errno);
 				continue;
 			}
-		slave.ip = inet_ntoa(slave.info.sin_addr);
+		char* ip = inet_ntoa(slave.info.sin_addr);
+		strcpy(slave.ip, ip);
 		slave.port = ntohs(slave.info.sin_port);
 		slave.active = true;
 		
@@ -84,7 +84,6 @@ void *slave_accept (void *args) {
 	}
 }
 
-// Delete a disconnected slave
 void slave_delete (int slave_fd) {
 	pthread_mutex_lock(&slave_mtx);
 	for (int index = 0; index < slave_cnt; index ++) {
@@ -95,16 +94,7 @@ void slave_delete (int slave_fd) {
 	pthread_mutex_unlock(&slave_mtx);
 }
 
-// Return a target slave to save the file
-Slaveid get_target_slave () {
-	Slaveid slave_id;
-	do {
-		slave_id = rand() % slave_cnt;
-	} while (slaves[slave_id].active == false);
-	return slave_id;
-}
-
-int main (int argc, char **argv) {
+int server_run () {
 	int error = 0;
 	
 	error = server_init();
@@ -118,10 +108,6 @@ int main (int argc, char **argv) {
 			printf("Failed spawn slave_accept()\n");
 			return -1;
 		}
-	
-	while (1);
-	
-	pthread_join(thread_slave_accept, NULL);
 
 	return 0;
 }
