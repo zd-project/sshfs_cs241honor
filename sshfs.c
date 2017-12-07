@@ -156,8 +156,8 @@ static int myfs_open(const char *path, struct fuse_file_info *fi)
 
     // send stat to slave
     write_all_to_socket(slave_fd, );
-    struct FuseMsg msg
-    struct FuseMsg msg = read_all_from_socket(slave_fd, );
+    struct FuseMsg msg;
+    ssize_t bytes_read = read_all_from_socket(slave_fd, );
     // check mode
     stat file_stat = ;
     if stat.st_
