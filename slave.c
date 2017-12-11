@@ -129,6 +129,7 @@ void process_stat () {
 }
 
 void process_request () {
+	memset(g_pt_msg, 0, sizeof(FuseMsg));
 	read_all_from_socket(sock_fd, (char *)g_pt_msg, sizeof(FuseMsg));
 	switch (g_pt_msg->func_code) {
 	case FUNC_GET:
