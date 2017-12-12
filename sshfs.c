@@ -134,7 +134,7 @@ static int myfs_open(const char *path, struct fuse_file_info *fi)
     memset(msg, 0, sizeof(FuseMsg));
     if (!slaves[sid].active) {
         fprintf(stderr, "slave died\n");
-        return -1;
+        return -EACCES;
     }
     size_t bytes_read = read_all_from_socket(sfd, msg, sizeof(FuseMsg));
     if (bytes_read == -1) {
@@ -144,7 +144,7 @@ static int myfs_open(const char *path, struct fuse_file_info *fi)
 
     if (msg -> response == RESP_FAILED) {
         fprintf(stderr, "failed to get file stat\n");
-        return -1;
+        return -EACCES;
     }
      
     // check mode
@@ -177,8 +177,7 @@ static int myfs_create(const char* path, mode_t mode, struct fuse_file_info* fi)
 
     if (!slaves[sid].active) {
         fprintf(stderr, "slave already died\n");
-        free(msg);
-        return -1;
+        return -EACCES;
     }
 
     // send PUT request to slave_sock 
@@ -202,7 +201,7 @@ static int myfs_create(const char* path, mode_t mode, struct fuse_file_info* fi)
     if (msg -> response == RESP_FAILED) {
         fprintf(stderr, "fail to create file\n");
         free(msg);
-        return -1;
+        return -EACCES;
     }
     return 0;
     // we want file mode, need an extra struct for file_create
@@ -220,13 +219,12 @@ static int myfs_write(const char* path, const char* buffer, size_t size, off_t o
     // send PUT request to slave_sock offset??  if has offset, with offset. 
     if (!slaves[sid].active) {
         fprintf(stderr, "slave already died\n");
-        free(msg);
-        return -1;
+        return -EACCES;
     }
     
     FuseMsg* msg = calloc(sizeof(FuseMsg), 1);
     msg -> func_code = FUNC_PUT;
-    msg -> buff = buffer;
+    msg -> buf = memcpy(msg->buf, buffer, size);
     // NOT SURE
     msg -> is_trunc = false;
     msg -> offset = offset;
@@ -249,7 +247,7 @@ static int myfs_write(const char* path, const char* buffer, size_t size, off_t o
     if (msg -> response == RESP_FAILED) {
         fprintf(stderr, "fail to create file\n");
         free(msg);
-        return -1;
+        return -EACCES;
     }
 
     return bytes_write;
@@ -268,7 +266,7 @@ static int myfs_truncate(const char* path, off_t offset, struct fuse_file_info* 
     if (!slaves[sid].active) {
         fprintf(stderr, "slave already died\n");
         free(msg);
-        return -1;
+        return -EACCES;
     }
     
     FuseMsg* msg = calloc(sizeof(FuseMsg), 1);
