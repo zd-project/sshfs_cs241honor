@@ -16,4 +16,4 @@ ssize_t read_all_from_socket(int socket, char *buffer, size_t count);
  * Returns the number of bytes written, 0 if socket is disconnected,
  * or -1 on failure.
  */
-ssize_t write_all_to_socket(int socket, const char *buffer, size_t count);
+ssize_t write_all_to_socket(int socket, char *buffer, size_t count);

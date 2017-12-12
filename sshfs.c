@@ -33,7 +33,6 @@
 #include <netdb.h>
 #include <unistd.h>
 #include <arpa/inet.h>
-#include <sshfs_utils.h>
 #include <stdbool.h>
 #include "fs_server.h"
 #include "protocol.h"
@@ -49,26 +48,25 @@ static int myfs_getattr(const char *path, struct stat *stbuf,
              struct fuse_file_info *fi)
 {
     (void) fi;
-    int res = 0;
 
     memset(stbuf, 0, sizeof(struct stat));
     if (strcmp(path, "/") == 0) {
         stbuf->st_mode = S_IFDIR | 0755;
         stbuf->st_nlink = 2;
     } else {
-        const char *filename = path + 1;
+        char *filename = (char*)path + 1;
         Slaveid sid = Filemgr_file_to_id(filename);
         if (sid == FILEMGR_NOFILE) {
-            printf(stderr, "slave not available\n");
+            fprintf(stderr, "slave not available\n");
             return -ENOENT;
         }
 
-        int slaveFd = slaves[sid].fd;
-
-        FuseMsg* statRequest = calloc(1, sizeof(FuseMsg));
+        int sfd = slaves[sid].fd;
+        
+        FuseMsg* msg = calloc(1, sizeof(FuseMsg));
         msg->func_code = FUNC_STAT;
-        msg->filename = filename;
-        if (write_all_to_socket(sfd, msg, sizeof(FuseMsg)) < 1) {
+        memcpy(msg->filename, filename, strlen(filename));
+        if (write_all_to_socket(sfd, (char*)msg, sizeof(FuseMsg)) < 1) {
             perror("request failure");
             return -EACCES;
         }
@@ -78,7 +76,7 @@ static int myfs_getattr(const char *path, struct stat *stbuf,
         }
 
         memset(msg, 0, sizeof(FuseMsg));
-        if (read_all_from_socket(sfd, msg, sizeof(FuseMsg)) < 1) {
+        if (read_all_from_socket(sfd, (char*)msg, sizeof(FuseMsg)) < 1) {
             perror("read failure");
             return -EACCES;
         }
@@ -97,6 +95,7 @@ static int myfs_getattr(const char *path, struct stat *stbuf,
         stbuf->st_nlink = 1;
         return 0;
     }
+    return 0;
 }
 
 static int myfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
@@ -112,7 +111,7 @@ static int myfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 
     filler(buf, ".", NULL, 0, 0);
     filler(buf, "..", NULL, 0, 0);
-    char*** file_matrix = Filemgr_get_files (Slaveid slave_id);
+    char*** file_matrix = Filemgr_get_files (slave_id);
     while (*file_matrix) {
         char **slave_files = *file_matrix;
         while (*slave_files) {
@@ -127,18 +126,18 @@ static int myfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 
 static int myfs_open(const char *path, struct fuse_file_info *fi) {
     // send stat to slave
-    char* filename = path++;
+    char* filename = (char*)path++;
     Slaveid sid = Filemgr_file_to_id(filename);
     if (sid == FILEMGR_NOFILE) {
-        printf(stderr, "slave does not exist\n");
+        fprintf(stderr, "slave does not exist\n");
         return -ENOENT;
     }
     int sfd = slaves[sid].fd;
 
     FuseMsg* msg = calloc(sizeof(FuseMsg), 1);
     msg -> func_code = FUNC_STAT;
-    msg -> filename = filename;
-    ssize_t bytes_write = write_all_to_socket(sfd, msg, sizeof(FuseMsg));
+    memcpy(msg -> filename, filename, strlen(filename));
+    ssize_t bytes_write = write_all_to_socket(sfd, (char*)msg, sizeof(FuseMsg));
     if (bytes_write == -1) {
         perror(NULL);
         return -ENOENT;
@@ -149,7 +148,7 @@ static int myfs_open(const char *path, struct fuse_file_info *fi) {
         fprintf(stderr, "slave died\n");
         return -EACCES;
     }
-    size_t bytes_read = read_all_from_socket(sfd, msg, sizeof(FuseMsg));
+    size_t bytes_read = read_all_from_socket(sfd, (char*)msg, sizeof(FuseMsg));
     if (bytes_read == -1) {
         perror(NULL);
         return -ENOENT;
@@ -161,13 +160,13 @@ static int myfs_open(const char *path, struct fuse_file_info *fi) {
     }
      
     // check mode
-    stat* file_stat = (stat*) msg -> buf;
-    int user_want_read = fi -> flags & O_ACCESS & O_RDONLY || fi -> flags & O_ACCESS & O_RDWR;
+    struct stat* file_stat = (struct stat*) msg -> buf;
+    int user_want_read = fi -> flags & O_ACCMODE & O_RDONLY || fi -> flags & O_ACCMODE & O_RDWR;
+    int user_want_write =  fi -> flags & O_ACCMODE & O_WRONLY || fi -> flags & O_ACCMODE & O_RDWR;
     if ((!(file_stat -> st_mode & S_IRUSR)) && user_want_read) {
         // you don't have read access but you want
         return -EACCES;
     } 
-    int user_want_write =  fi -> flags & O_ACCESS & O_WRONLY || fi -> flags & O_ACCESS & O_RDWR;
     else if ((!(file_stat -> st_mode & S_IWUSR)) && user_want_write) {
         // want to write but don't have permission
         return -EACCES;
@@ -182,16 +181,16 @@ static int myfs_read(const char *path, char *buf, size_t size, off_t offset,
 {
     if (!size) return 0;
 
-    char* filename = path++;
-    Slaveid id = Filemgr_file_to_id(filename);
+    char* filename = (char*)path++;
+    Slaveid sid = Filemgr_file_to_id(filename);
 
-    if (id == FILEMGR_NOFILE) {
-        printf(stderr, "slave does not exist\n");
+    if (sid == FILEMGR_NOFILE) {
+        fprintf(stderr, "slave does not exist\n");
         return -EIO;
     }
     int sfd = slaves[sid].fd; 
 
-    if (!slaves[id].active) {
+    if (!slaves[sid].active) {
         fprintf(stderr, "slave already died\n");
         return -EIO;
     }
@@ -201,7 +200,7 @@ static int myfs_read(const char *path, char *buf, size_t size, off_t offset,
     msg->offset = offset;
     msg->size = size;
 
-    if (write_all_to_socket(sfd, msg, sizeof(FuseMsg)) < 1) {
+    if (write_all_to_socket(sfd, (char*)msg, sizeof(FuseMsg)) < 1) {
         perror("request failure");
         free(msg);
         return -EIO;
@@ -213,7 +212,7 @@ static int myfs_read(const char *path, char *buf, size_t size, off_t offset,
     }
 
     memset(msg, 0, sizeof(FuseMsg));
-    if (read_all_from_socket(sfd, msg, sizeof(FuseMsg)) < 1) {
+    if (read_all_from_socket(sfd, (char*)msg, sizeof(FuseMsg)) < 1) {
         perror("read failure");
         free(msg);
         return -EIO;
@@ -224,18 +223,18 @@ static int myfs_read(const char *path, char *buf, size_t size, off_t offset,
         free(msg);
         return -EIO;
     } else {
-        memcpy(buf, mes->buf, msg->size);
+        memcpy(buf, msg->buf, msg->size);
         return 0;
     }
 }
 
 static int myfs_create(const char* path, mode_t mode, struct fuse_file_info* fi) {
     // get a random slave_sock from file manager
-    char* filename = path++;
+    char* filename = (char*)path++;
     Slaveid sid = Filemgr_assign_slave(filename);
 
     if (sid == FILEMGR_NOFILE) {
-        printf(stderr, "slave does not exist\n");
+        fprintf(stderr, "slave does not exist\n");
         return -ENOENT;
     }
     int sfd = slaves[sid].fd; 
@@ -248,16 +247,16 @@ static int myfs_create(const char* path, mode_t mode, struct fuse_file_info* fi)
     // send PUT request to slave_sock 
     FuseMsg* msg = calloc(sizeof(FuseMsg), 1);
     msg -> func_code = FUNC_PUT;
-    msg -> filename = filename; 
+    memcpy(msg->filename, filename, strlen(filename)); 
 
-    ssize_t bytes_write = write_all_to_socket(sfd, msg, sizeof(FuseMsg));
+    ssize_t bytes_write = write_all_to_socket(sfd, (char*)msg, sizeof(FuseMsg));
     if (bytes_write == -1) {
         perror(NULL);
         return -ENOENT;
     }
 
     memset(msg, 0, sizeof(FuseMsg));
-    ssize_t bytes_read = read_all_from_socket(sfd, msg, sizeof(FuseMsg));
+    ssize_t bytes_read = read_all_from_socket(sfd, (char*)msg, sizeof(FuseMsg));
     if (bytes_read == -1) {
         perror(NULL);
         return -ENOENT;
@@ -277,9 +276,9 @@ static int myfs_write(const char* path, const char* buffer, size_t size, off_t o
     //TODO qeustion, buffer is a char*? what if the file content has \0 in the
     // middle?
     // get slave_sock that has the file on it 
-    char* filename = path++;
+    char* filename = (char*)path++;
     Slaveid sid = Filemgr_file_to_id(filename); 
-    int fsd = slaves[sid].fd; 
+    int sfd = slaves[sid].fd; 
     
     // send PUT request to slave_sock offset??  if has offset, with offset. 
     if (!slaves[sid].active) {
@@ -289,21 +288,20 @@ static int myfs_write(const char* path, const char* buffer, size_t size, off_t o
     
     FuseMsg* msg = calloc(sizeof(FuseMsg), 1);
     msg -> func_code = FUNC_PUT;
-    msg -> buf = memcpy(msg->buf, buffer, size);
+    memcpy(msg->buf, buffer, size);
     // NOT SURE
     msg -> is_trunc = false;
     msg -> offset = offset;
-
     msg -> size = size;
 
-    ssize_t bytes_write = write_all_to_socket(sfd, msg, sizeof(FuseMsg));
+    ssize_t bytes_write = write_all_to_socket(sfd, (char*)msg, sizeof(FuseMsg));
     if (bytes_write == -1) {
         perror(NULL);
         return -ENOENT;
     }
     
     memset(msg, 0, sizeof(FuseMsg));
-    ssize_t bytes_read = read_all_from_socket(sfd, msg, sizeof(FuseMsg));
+    ssize_t bytes_read = read_all_from_socket(sfd, (char*)msg, sizeof(FuseMsg));
     if (bytes_read == -1) {
         perror(NULL);
         return -ENOENT;
@@ -323,14 +321,13 @@ static int myfs_truncate(const char* path, off_t offset, struct fuse_file_info* 
     // check permssion (if you don't have write permission)
      
     // send PUT request with offset 0 truncate true
-    char* filenmae = path++;
+    char* filename = (char*)path++;
     Slaveid sid = Filemgr_file_to_id(filename); 
-    int fsd = slaves[sid].fd; 
+    int sfd = slaves[sid].fd; 
     
     // send PUT request to slave_sock offset??  if has offset, with offset. 
     if (!slaves[sid].active) {
         fprintf(stderr, "slave already died\n");
-        free(msg);
         return -EACCES;
     }
     
@@ -338,7 +335,7 @@ static int myfs_truncate(const char* path, off_t offset, struct fuse_file_info* 
     msg -> func_code = FUNC_PUT;
     msg -> is_trunc = true;
 
-    ssize_t bytes_write = write_all_to_socket(sfd, msg, sizeof(FuseMsg));
+    ssize_t bytes_write = write_all_to_socket(sfd, (char*)msg, sizeof(FuseMsg));
     if (bytes_write == -1) {
         perror(NULL);
         return -ENOENT;
