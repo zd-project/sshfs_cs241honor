@@ -37,78 +37,11 @@
 #include <sshfs_utils.h>
 #include <stdbool.h>
 
-const char *PORT = "16354";
-char defaultFilename[1000] = "myfs.honor";
-char defaultContent[1000] = "The first file\n";
-
-void read_from_internet() {
-    int sock_fd = socket(AF_INET, SOCK_STREAM, 0);
-    if (sock_fd == -1) {
-        perror(NULL);
-        exit(1);
-    }
-
-    int optval = 1;
-    setsockopt(sock_fd, SOL_SOCKET, SO_REUSEPORT, &optval, sizeof(optval));
-
-    struct addrinfo hints;
-    memset(&hints, 0, sizeof(struct addrinfo));
-    hints.ai_family = AF_INET; /* IPv4 only */
-    hints.ai_socktype = SOCK_STREAM; /* TCP */
-    hints.ai_flags = AI_PASSIVE;
-
-    struct addrinfo *result;
-    int err = getaddrinfo(NULL, PORT, &hints, &result);
-    if (err) {
-        fprintf(stderr, "%s\n", gai_strerror(err));
-        exit(1);
-    }
-
-    if (bind(sock_fd, result->ai_addr, result->ai_addrlen)) {
-        perror(NULL);
-        exit(1);
-    }
-
-    if (listen(sock_fd, 10) != 0) {
-        perror(NULL);
-        exit(1);
-    }
-    
-    printf("Syncing...\n");
-    int client_fd = accept(sock_fd, NULL, NULL);
-    if (client_fd == -1) {
-        perror(NULL);
-        exit(1);
-    }
-
-    int len;
-    len = read(client_fd, defaultFilename, sizeof(defaultFilename));
-    defaultFilename[len] = '\0';
-
-    printf("Read files\n");
-    printf("===\n");
-    printf("%s\n", defaultFilename);
-
-    len = read(client_fd, defaultContent, sizeof(defaultContent));
-    defaultContent[len - 1] = '\n';
-    defaultContent[len] = '\0';
-
-    printf("Read content: %d chars\n", len);
-    printf("===\n");
-    printf("%s\n", defaultContent);
-
-    if (shutdown(sock_fd, SHUT_RDWR) != 0) {
-        perror("shutdown():");
-    }
-    close(sock_fd);
-    if (shutdown(client_fd, SHUT_RDWR) != 0) {
-        perror("shutdown():");
-    }
-    close(client_fd);
-
-    freeaddrinfo(result);
-}
-
+#include "types.h"
+#include "filemgr.h"
+#include "fs_server.h"
+#include "protocol.h"
+#include "network_utils.h"
 
 static int myfs_getattr(const char *path, struct stat *stbuf,
              struct fuse_file_info *fi)
@@ -120,14 +53,48 @@ static int myfs_getattr(const char *path, struct stat *stbuf,
     if (strcmp(path, "/") == 0) {
         stbuf->st_mode = S_IFDIR | 0755;
         stbuf->st_nlink = 2;
-    } else if (strcmp(path+1, defaultFilename) == 0) {
-        stbuf->st_mode = S_IFREG | 0444;
-        stbuf->st_nlink = 1;
-        stbuf->st_size = strlen(defaultContent);
-    } else
-        res = -ENOENT;
+    } else {
+        const char *filename = path + 1;
+        Slaveid sid = Filemgr_file_to_id(filename);
+        if (sid == FILEMGR_NOFILE) {
+            printf(stderr, "slave not available\n");
+            return -ENOENT;
+        }
 
-    return res;
+        int slaveFd = slaves[sid].fd;
+
+        FuseMsg* statRequest = calloc(1, sizeof(FuseMsg));
+        msg->func_code = FUNC_STAT;
+        msg->filename = filename;
+        if (write_all_to_socket(sfd, msg, sizeof(FuseMsg)) < 1) {
+            perror("request failure");
+            return -EACCES;
+        }
+        if (!slaves[sid].active) {
+            fprintf(stderr, "slave died\n");
+            return -ENOENT;
+        }
+
+        memset(msg, 0, sizeof(FuseMsg));
+        if (read_all_from_socket(sfd, msg, sizeof(FuseMsg)) < 1) {
+            perror("read failure");
+            return -EACCES;
+        }
+
+        if (msg->response == RESP_FAILED) {
+            fprintf(stderr, "failed to get file stat\n");
+            return -ENOENT;
+        }
+
+        struct stat* file_stat = (struct stat *)msg->buf;
+        memcpy(stbuf, file_stat, sizeof(struct stat *));
+        stbuf->st_uid = getuid(); 
+        stbuf->st_gid = getgid();
+        stbuf->st_ino = 0;
+        stbuf->st_mode |= S_IFREG | 0644;
+        stbuf->st_nlink = 1;
+        return 0;
+    }
 }
 
 static int myfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
@@ -148,8 +115,7 @@ static int myfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
     return 0;
 }
 
-static int myfs_open(const char *path, struct fuse_file_info *fi)
-{
+static int myfs_open(const char *path, struct fuse_file_info *fi) {
     // send stat to slave
     char* filename = path++;
     Slaveid sid = Filemgr_file_to_id(filename);
@@ -199,6 +165,13 @@ static int myfs_open(const char *path, struct fuse_file_info *fi)
     free(msg);
     msg = NULL;
     return 0;
+}
+
+static int myfs_read(const char *path, char *buf, size_t size, off_t offset,
+              struct fuse_file_info *fi)
+{
+    if (!size) return 0;
+    path++;
 }
 
 static int myfs_create(const char* path, mode_t mode, struct fuse_file_info* fi) {
