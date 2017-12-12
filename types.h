@@ -7,6 +7,7 @@ typedef uint8_t Slaveid;
 
 #define FILENAME_LEN 32
 #define FILE_PER_SLAVE 256
+#define SLAVE_UNAVAILABLE FILE_PER_SLAVE
 
 typedef uint16_t Hash;
 #define FILEMGR_HASH_MAX (1<<(sizeof(Hash)))
