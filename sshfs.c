@@ -109,45 +109,6 @@ void read_from_internet() {
     freeaddrinfo(result);
 }
 
-
-static int myfs_getattr(const char *path, struct stat *stbuf,
-             struct fuse_file_info *fi)
-{
-    (void) fi;
-    int res = 0;
-
-    memset(stbuf, 0, sizeof(struct stat));
-    if (strcmp(path, "/") == 0) {
-        stbuf->st_mode = S_IFDIR | 0755;
-        stbuf->st_nlink = 2;
-    } else if (strcmp(path+1, defaultFilename) == 0) {
-        stbuf->st_mode = S_IFREG | 0444;
-        stbuf->st_nlink = 1;
-        stbuf->st_size = strlen(defaultContent);
-    } else
-        res = -ENOENT;
-
-    return res;
-}
-
-static int myfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
-             off_t offset, struct fuse_file_info *fi,
-             enum fuse_readdir_flags flags)
-{
-    (void) offset;
-    (void) fi;
-    (void) flags;
-
-    if (strcmp(path, "/") != 0)
-        return -ENOENT;
-
-    filler(buf, ".", NULL, 0, 0);
-    filler(buf, "..", NULL, 0, 0);
-    filler(buf, defaultFilename, NULL, 0, 0);
-
-    return 0;
-}
-
 static int myfs_open(const char *path, struct fuse_file_info *fi)
 {
     // send stat to slave
@@ -185,7 +146,7 @@ static int myfs_open(const char *path, struct fuse_file_info *fi)
     }
      
     // check mode
-    stat* file_stat = (stat*) msg;
+    stat* file_stat = (stat*) msg -> buf;
     int user_want_read = fi -> flags & O_ACCESS & O_RDONLY || fi -> flags & O_ACCESS & O_RDWR;
     if ((!(file_stat -> st_mode & S_IRUSR)) && user_want_read) {
         // you don't have read access but you want
