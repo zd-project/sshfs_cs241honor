@@ -52,12 +52,16 @@ Slaveid Filemgr_file_to_id (char* filename) {
     }
 }
 
-char** Filemgr_get_files (Slaveid slave_id) {
-    if (slave[slave_id].active) {
-        return filemgr.s2f[slave_id];
-    } else {
-        return NULL;
+char*** Filemgr_get_files () {
+    char ***file_matrix = malloc(sizeof(char **) * (1 + SLAVE_MAX));
+    int cnt = 0;
+    for (Slave_id slave_id = 0; id < SLAVE_MAX; id++) {
+        if (slave[slave_id].active) {
+            file_matrix[cnt++] = filemgr.s2f[slave_id];
+        }
+        file_matrix[cnt] = NULL;
     }
+    return file_matrix;
 }
 
 Hash Filemgr_hash (char* filename) {

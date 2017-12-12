@@ -87,7 +87,7 @@ static int myfs_getattr(const char *path, struct stat *stbuf,
         }
 
         struct stat* file_stat = (struct stat *)msg->buf;
-        memcpy(stbuf, file_stat, sizeof(struct stat *));
+        memcpy(stbuf, file_stat, sizeof(struct stat));
         stbuf->st_uid = getuid(); 
         stbuf->st_gid = getgid();
         stbuf->st_ino = 0;
@@ -110,7 +110,15 @@ static int myfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 
     filler(buf, ".", NULL, 0, 0);
     filler(buf, "..", NULL, 0, 0);
-    filler(buf, defaultFilename, NULL, 0, 0);
+    char*** file_matrix = Filemgr_get_files (Slaveid slave_id);
+    while (*file_matrix) {
+        char **slave_files = *file_matrix;
+        while (*slave_files) {
+            filler(buf, *slave_files, NULL, 0, 0);
+            slave_files++;
+        }
+        file_matrix++;
+    }
 
     return 0;
 }
@@ -171,7 +179,52 @@ static int myfs_read(const char *path, char *buf, size_t size, off_t offset,
               struct fuse_file_info *fi)
 {
     if (!size) return 0;
-    path++;
+
+    char* filename = path++;
+    Slaveid id = Filemgr_file_to_id(filename);
+
+    if (id == FILEMGR_NOFILE) {
+        printf(stderr, "slave does not exist\n");
+        return -EIO;
+    }
+    int sfd = slaves[sid].fd; 
+
+    if (!slaves[id].active) {
+        fprintf(stderr, "slave already died\n");
+        return -EIO;
+    }
+
+    FuseMsg *msg = calloc(1, sizeof(FuseMsg));
+    msg->func_code = FUNC_GET;
+    msg->offset = offset;
+    msg->size = size;
+
+    if (write_all_to_socket(sfd, msg, sizeof(FuseMsg)) < 1) {
+        perror("request failure");
+        free(msg);
+        return -EIO;
+    }
+    if (!slaves[sid].active) {
+        fprintf(stderr, "slave died\n");
+        free(msg);
+        return -EIO;
+    }
+
+    memset(msg, 0, sizeof(FuseMsg));
+    if (read_all_from_socket(sfd, msg, sizeof(FuseMsg)) < 1) {
+        perror("read failure");
+        free(msg);
+        return -EIO;
+    }
+
+    if (msg->response == RESP_FAILED) {
+        fprintf(stderr, "fail to create file\n");
+        free(msg);
+        return -EIO;
+    } else {
+        memcpy(buf, mes->buf, msg->size);
+        return 0;
+    }
 }
 
 static int myfs_create(const char* path, mode_t mode, struct fuse_file_info* fi) {
@@ -297,11 +350,11 @@ static struct fuse_operations myfs_oper = {
 //    .init           = myfs_init,
     .getattr    = myfs_getattr,
     .readdir    = myfs_readdir,
-    .open        = myfs_open,
-    .read        = myfs_read,
-    .create = myfs_create,
-    .write = myfs_write,
-    .truncate = myfs_truncate,
+    .open       = myfs_open,
+    .read       = myfs_read,
+    .create     = myfs_create,
+    .write      = myfs_write,
+    .truncate   = myfs_truncate,
 };
 
 int main(int argc, char *argv[])
