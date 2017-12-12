@@ -16,7 +16,6 @@
  * \include myfs.c
  */
 
-
 #define FUSE_USE_VERSION 32
 
 //#include <config.h>
@@ -36,6 +35,9 @@
 #include <arpa/inet.h>
 #include <sshfs_utils.h>
 #include <stdbool.h>
+#include "fs_server.h"
+#include "protocol.h"
+#include "types.h"
 
 const char *PORT = "16354";
 char defaultFilename[1000] = "myfs.honor";
@@ -294,5 +296,6 @@ static struct fuse_operations myfs_oper = {
 
 int main(int argc, char *argv[])
 {
+    server_run();
     return fuse_main(argc, argv, &myfs_oper, NULL);
 }
