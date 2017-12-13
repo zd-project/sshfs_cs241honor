@@ -168,7 +168,7 @@ bool read_file_and_upload(char* file_name){
 		perror("Upload failed");
 		return false;
 	}
-	printf("write bytes: %ld\n", ret_code);
+	/*printf("write bytes: %ld\n", ret_code);*/
 
 	fclose(f);
 	printf("File: [%s] uploaded to the server\n", file_name);
@@ -180,16 +180,16 @@ bool send_cmd_to_server(char* cmd_to_server){
 	g_pt_execute_cmd->meta_data.data_length = strlen(cmd_to_server) + 1;
 	strcpy(g_pt_execute_cmd->command, cmd_to_server);
 
-	printf("Func code: %d\n", g_pt_execute_cmd->meta_data.func_code);
-	printf("Data len: %u\n", g_pt_execute_cmd->meta_data.data_length);
-	printf("CMD: [%s]\n", g_pt_execute_cmd->command);
+	/*printf("Func code: %d\n", g_pt_execute_cmd->meta_data.func_code);*/
+	/*printf("Data len: %u\n", g_pt_execute_cmd->meta_data.data_length);*/
+	/*printf("CMD: [%s]\n", g_pt_execute_cmd->command);*/
 
 	ssize_t ret_code = write_all_to_socket(g_sock, (char*) g_pt_execute_cmd, sizeof(EXECUTE_CMD));
 	if(ret_code < 0){
 		perror("send() failed");
 		return false;
 	}
-	printf("write bytes: %ld\n", ret_code);
+	/*printf("write bytes: %ld\n", ret_code);*/
 
 	printf("CMD: [%s] sent to the server\n", cmd_to_server);
 	return true;
@@ -203,7 +203,7 @@ void receive_feedback_and_print(void){
 		perror("recv() failed");
 		return;
 	}
-	printf("read bytes: %ld\n", ret_code);
+	/*printf("read bytes: %ld\n", ret_code);*/
 	
 	// extract the string
 	if(g_pt_feedback->meta_data.func_code != FUNC_FEEDBACK){
@@ -264,7 +264,7 @@ void process_cmd_in(char* shell_cmd_in){
 	printf("cmd accepted: %s\n", shell_cmd_in);
 	size_t cmd_word_count = 0;
 	char** command = strsplit(shell_cmd_in, 10, &cmd_word_count);
-	printf("word count: %lu\n", cmd_word_count);
+	/*printf("word count: %lu\n", cmd_word_count);*/
 	if(cmd_word_count == 0){
 		// print usage
 		return;
