@@ -118,6 +118,7 @@ static int myfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 			filler(buf, filemgr.s2f[slave_id][i], NULL, 0, 0);
 		}
 	}
+    printf("done with readdir\n");
 	/*
     char*** file_matrix = Filemgr_get_files();
     while (*file_matrix) {
