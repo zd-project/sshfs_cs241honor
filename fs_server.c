@@ -70,6 +70,7 @@ void *slave_accept (void *args) {
 				printf("Failed accept(): %d\n", errno);
 				continue;
 			}
+        /*fprintf(stderr, "accpeted\n");*/
 		char* ip = inet_ntoa(slave.info.sin_addr);
 		strcpy(slave.ip, ip);
 		slave.port = ntohs(slave.info.sin_port);
@@ -78,9 +79,12 @@ void *slave_accept (void *args) {
 		// write slave info into array
 		pthread_mutex_lock(&slave_mtx);
 		memcpy(&slaves[slave_cnt], &slave, sizeof(Netend));
+        /*fprintf(stderr, "start filemgr init slave\n");*/
 		Filemgr_init_slave(slave_cnt, slave.fd);
+        /*fprintf(stderr, "finish filemgr init slave\n");*/
 		slave_cnt ++;
 		pthread_mutex_unlock(&slave_mtx);
+        /*fprintf(stderr, "one iteration\n");*/
 	}
     return NULL;
 }
@@ -99,6 +103,7 @@ int server_run () {
 	int error = 0;
 	
 	error = server_init();
+    /*fprintf(stderr, "finish init\n");*/
 		if (error) {
 			printf("Failed server_init()\n");
 			return -1;
