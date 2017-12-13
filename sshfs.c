@@ -111,9 +111,12 @@ static int myfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
     if (strcmp(path, "/") != 0)
         return -ENOENT;
     printf("%s\n", path);
+    /*char* full_path = calloc(strlen("slave_dir")+1,1);*/
+    /*full_path = strcat(full_path, "/");*/
+    /*full_path = strcat(full_path, "slave_dir");*/
     filler(buf, ".", NULL, 0, 0);
     filler(buf, "..", NULL, 0, 0);
-	for (Slaveid slave_id = 0; slave_id < SLAVE_MAX; slave_id++) {
+	for (Slaveid slave_id = 0; slave_id < SLAVE_MAX-1; slave_id++) {
 		for (uint8_t i = 0; i < filemgr.cnt[slave_id]; i++) {
 			filler(buf, filemgr.s2f[slave_id][i], NULL, 0, 0);
 		}
@@ -379,7 +382,7 @@ static int myfs_truncate(const char* path, off_t offset, struct fuse_file_info* 
 static struct fuse_operations myfs_oper = {
 //    .init           = myfs_init,
     .getattr    = myfs_getattr,
-    .setattr    = myfs_setattr,
+    /*.setattr    = myfs_setattr,*/
     .readdir    = myfs_readdir,
     .open       = myfs_open,
     .read       = myfs_read,
