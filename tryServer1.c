@@ -11,7 +11,7 @@
 #include "proto_client_master.h"
 #include "util.h"
 
-#define PORT_NUM "9001"
+#define PORT_NUM "10086"
 #define CLIENT_MESSAGE_SIZE 100*K
 
 // handle message sent by client

@@ -13,4 +13,5 @@ slave:
 clean:
 	rm slave
 	rm sshfs
-
+	rm server
+	rm client
