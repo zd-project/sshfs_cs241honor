@@ -13,7 +13,7 @@ extern Filemgr filemgr;
 void Filemgr_init ();
 void Filemgr_init_slave (Slaveid slave_id, int slave_fd);
 Slaveid Filemgr_assign_slave(char *filename);
-//void Filemgr_set (char* filename, Slaveid slave_id);
+void Filemgr_set (char* filename, Slaveid slave_id);
 Slaveid Filemgr_file_to_id (char* filename);
 char*** Filemgr_get_files ();
 Hash Filemgr_hash (char* filename);

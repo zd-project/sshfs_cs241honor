@@ -27,12 +27,13 @@ void Filemgr_init_slave (Slaveid slave_id, int slave_fd) {
 
 Slaveid Filemgr_assign_slave(char *filename) {
     // first fit policy
-    for (Slave_id id = 0; id < SLAVE_MAX; id++) {
-        if (slave[id].active && cnt[id] != SLAVE_UNAVAILABLE) {
+    for (Slaveid id = 0; id < SLAVE_MAX; id++) {
+        if (slaves[id].active && filemgr.cnt[id] != SLAVE_UNAVAILABLE) {
             Filemgr_set(filename, id);
             return id;
         }
     }
+    return -1;
 }
 
 void Filemgr_set (char* filename, Slaveid slave_id) {
@@ -44,8 +45,8 @@ void Filemgr_set (char* filename, Slaveid slave_id) {
 
 Slaveid Filemgr_file_to_id (char* filename) {
 	Hash filehash = Filemgr_hash(filename);
-	Slave_id id = filemgr.f2s[filehash];
-    if (slave[id].active) {
+	Slaveid id = filemgr.f2s[filehash];
+    if (slaves[id].active) {
         return id;
     } else {
         return FILEMGR_NOFILE;
@@ -55,8 +56,8 @@ Slaveid Filemgr_file_to_id (char* filename) {
 char*** Filemgr_get_files () {
     char ***file_matrix = malloc(sizeof(char **) * (1 + SLAVE_MAX));
     int cnt = 0;
-    for (Slave_id slave_id = 0; id < SLAVE_MAX; id++) {
-        if (slave[slave_id].active) {
+    for (Slaveid slave_id = 0; slave_id < SLAVE_MAX; slave_id++) {
+        if (slaves[slave_id].active) {
             file_matrix[cnt++] = filemgr.s2f[slave_id];
         }
         file_matrix[cnt] = NULL;

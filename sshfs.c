@@ -38,7 +38,6 @@
 #include "protocol.h"
 #include "types.h"
 
-#include "types.h"
 #include "filemgr.h"
 #include "fs_server.h"
 #include "protocol.h"

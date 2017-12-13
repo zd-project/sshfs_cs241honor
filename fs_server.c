@@ -51,8 +51,8 @@ int server_init () {
 		}
 	
 	memcpy(&(master.info), (struct sockaddr_in *)res->ai_addr, sizeof(struct sockaddr_in));
-	char* up = inet_ntoa(master.info.sin_addr);
-	strcpy(master.ip, ip)
+	char* ip = inet_ntoa(master.info.sin_addr);
+	strcpy(master.ip, ip);
 	master.port = ntohs(master.info.sin_port);
 	master.active = true;
 
@@ -82,6 +82,7 @@ void *slave_accept (void *args) {
 		slave_cnt ++;
 		pthread_mutex_unlock(&slave_mtx);
 	}
+    return NULL;
 }
 
 void slave_delete (int slave_fd) {
