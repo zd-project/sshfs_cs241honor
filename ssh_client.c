@@ -14,7 +14,7 @@
 #include "util.h"
 // internet constants
 #define DEAN_VM 			"fa17-cs241-083.cs.illinois.edu"
-#define SERVER_PORT_STR 	"9001"
+#define SERVER_PORT_STR 	"10086"
 #define DEAN_PC_IP 			"192.168.1.2"
 #define SERVER_PORT 		10086
 // cmds
