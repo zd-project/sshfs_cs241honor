@@ -110,6 +110,12 @@ static int myfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 
     filler(buf, ".", NULL, 0, 0);
     filler(buf, "..", NULL, 0, 0);
+	for (Slaveid slave_id = 0; slave_id < SLAVE_MAX; slave_id++) {
+		for (uint8_t i = 0; i < filemgr.cnt[slave_id]; i++) {
+			filler(buf, filemgr.s2f[slave_id][i], NULL, 0, 0);
+		}
+	}
+	/*
     char*** file_matrix = Filemgr_get_files();
     while (*file_matrix) {
         char **slave_files = *file_matrix;
@@ -119,7 +125,7 @@ static int myfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
         }
         file_matrix++;
     }
-
+	*/
     return 0;
 }
 
