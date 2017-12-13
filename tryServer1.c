@@ -53,7 +53,8 @@ int main(int argc, char* argv[]) {
         exit(1);
     }
 
-    printf("Waiting for incoming connections");
+    fprintf(stderr, "hi\n");
+    fprintf(stderr, "Waiting for incoming connections");
 
     // accept connection from an incoming client
     int client_sock = accept(server_socket, NULL, NULL);
@@ -61,7 +62,7 @@ int main(int argc, char* argv[]) {
         perror("accept failed");
         return 1;
     }
-    printf("Connection accepted\n");
+    fprintf(stderr, "Connection accepted\n");
     char client_message[CLIENT_MESSAGE_SIZE];
     int read_size;
 
@@ -79,6 +80,7 @@ int main(int argc, char* argv[]) {
 }
 
 void receive(char client_message[CLIENT_MESSAGE_SIZE], int client_sock) {
+    fprintf(stderr, "enter receive\n"); 
     META_DATA* meta = (META_DATA*) client_message;
     unsigned data_length = meta -> data_length;
     // printf("data_length: %u\n", data_length);
