@@ -52,7 +52,7 @@ Slaveid Filemgr_file_to_id (char* filename) {
         return FILEMGR_NOFILE;
     }
 }
-
+/*
 char*** Filemgr_get_files () {
     char ***file_matrix = malloc(sizeof(char **) * (1 + SLAVE_MAX));
     int cnt = 0;
@@ -64,7 +64,7 @@ char*** Filemgr_get_files () {
     }
     return file_matrix;
 }
-
+*/
 Hash Filemgr_hash (char* filename) {
 	Hash filehash = 0;
 	while (*filename) {
