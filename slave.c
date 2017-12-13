@@ -61,8 +61,10 @@ void send_all_current_files(void){
 	}
 
 
-	printf("%s\n", file_list);
-	printf("%lu\n", file_list_size);
+//	printf("%s\n", file_list);
+//	printf("%lu\n", file_list_size);
+
+	write(sock_fd, file_list, 65536);
 }
 
 // global data sections
@@ -112,7 +114,7 @@ void process_get () {
 void process_put () {
 	g_pt_msg->func_code = FUNC_RESP;
 	g_pt_msg->response = RESP_SUCCEED;
-	int fd = open(g_pt_msg->filename, O_WRONLY);
+	int fd = open(g_pt_msg->filename, O_RDWR | O_CREAT | O_TRUNC, S_IRWXU | S_IRWXG | S_IRWXO);
 	pwrite(fd, g_pt_msg->buf, g_pt_msg->size, g_pt_msg->offset);
 	close(fd);
 }
@@ -125,7 +127,8 @@ void process_del () {
 void process_stat () {
 	g_pt_msg->func_code = FUNC_RESP;
 	g_pt_msg->response = RESP_SUCCEED;
-	stat(g_pt_msg->filename, (struct stat *)g_pt_msg->buf);
+	int ret = stat(g_pt_msg->filename, (struct stat *)g_pt_msg->buf);
+	if (ret) g_pt_msg->response = RESP_FAILED;
 }
 
 void process_request () {
@@ -147,6 +150,7 @@ void process_request () {
 	default:
 		break;
 	}
+//	printf("%d %d %s %d %d %d %d %s\n", g_pt_msg->func_code, g_pt_msg->response, g_pt_msg->filename, g_pt_msg->size, g_pt_msg->size, g_pt_msg->offset, g_pt_msg->is_trunc, g_pt_msg->buf);
 	write_all_to_socket(sock_fd, (char *)g_pt_msg, sizeof(FuseMsg));
 }
 
