@@ -110,7 +110,7 @@ static int myfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 
     filler(buf, ".", NULL, 0, 0);
     filler(buf, "..", NULL, 0, 0);
-    char*** file_matrix = Filemgr_get_files(slave_id);
+    char*** file_matrix = Filemgr_get_files();
     while (*file_matrix) {
         char **slave_files = *file_matrix;
         while (*slave_files) {
