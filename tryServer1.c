@@ -9,7 +9,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include "proto_client_master.h"
-#include "util.h"
+#include "server_utils.h"
 
 #define PORT_NUM "10086"
 #define CLIENT_MESSAGE_SIZE 100*K
